@@ -43,6 +43,12 @@ DARK_CSS = """
         border-radius: 10px;
         padding: 14px 16px;
     }
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: #b8c2d4 !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #f5f7fa !important;
+    }
     .regime-banner {
         border-radius: 14px;
         padding: 28px 24px;
