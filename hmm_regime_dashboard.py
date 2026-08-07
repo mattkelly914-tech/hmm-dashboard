@@ -61,6 +61,18 @@ DARK_CSS = """
         opacity: 0.85;
         margin-top: 8px;
     }
+    .regime-alert {
+        border-radius: 10px;
+        padding: 14px 18px;
+        border: 1px solid;
+        margin-bottom: 16px;
+        font-size: 1.02rem;
+        animation: pulse-alert 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-alert {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.72; }
+    }
     div[data-testid="stTable"] table {
         color: #e6e6e6;
     }
@@ -89,6 +101,12 @@ lookback_years = st.sidebar.number_input(
 )
 n_iter = st.sidebar.slider("HMM max iterations", 50, 500, 100, step=50)
 random_state = st.sidebar.number_input("Random state (seed)", value=42, step=1)
+alert_window = st.sidebar.number_input(
+    "Regime shift alert window (trading days)",
+    min_value=1, max_value=30, value=3, step=1,
+    help="Show a shift alert when the current regime started within this many "
+         "trading days of the most recent data point.",
+)
 run_button = st.sidebar.button("🚀 Run Analysis", use_container_width=True)
 
 st.sidebar.markdown("---")
@@ -342,8 +360,7 @@ raw_order = state_means.index.tolist()  # [best, ..., worst] by mean return
 while len(raw_order) < 3:
     raw_order.append(-1)
 
-bullish_raw, *_mid, bearish_raw = raw_order[0], raw_order[1:-1], raw_order[-1]
-mid_raw = _mid[0] if _mid else None
+bullish_raw, mid_raw, bearish_raw = raw_order[0], raw_order[1], raw_order[2]
 
 remap = {}
 if bullish_raw != -1:
@@ -404,16 +421,23 @@ with tab_classifier:
     )
 
     spans = contiguous_spans(data.index, data["State"].values)
+    shapes = []
     for start, end, slot in spans:
         name = slot_to_name.get(slot, "Unknown")
         style = REGIME_STYLE.get(name, {"fill": "rgba(150,150,150,0.15)"})
-        fig_price.add_vrect(
+        shapes.append(dict(
+            type="rect",
+            xref="x",
+            yref="paper",
             x0=start,
             x1=end,
+            y0=0,
+            y1=1,
             fillcolor=style["fill"],
             line_width=0,
             layer="below",
-        )
+        ))
+    fig_price.update_layout(shapes=shapes)
 
     # Dummy traces so a regime legend shows up (vrects don't appear in legend)
     for slot in [0, 1, 2]:
@@ -442,6 +466,30 @@ with tab_classifier:
     )
 
     st.plotly_chart(fig_price, use_container_width=True)
+
+    # --------------------------------------------------------------------------
+    # Regime-shift alert — fires when the current regime began recently
+    # --------------------------------------------------------------------------
+    current_span_start, current_span_end, current_span_slot = spans[-1]
+    days_in_current_regime = len(data.loc[current_span_start:current_span_end])
+
+    if len(spans) > 1 and days_in_current_regime <= alert_window:
+        prev_slot = spans[-2][2]
+        prev_name = slot_to_name.get(prev_slot, "Unknown")
+        curr_name = slot_to_name.get(current_span_slot, "Unknown")
+        alert_style = REGIME_STYLE.get(curr_name, {"solid": "#e6e6e6"})
+        shift_date = current_span_start.strftime("%Y-%m-%d")
+        day_word = "day" if days_in_current_regime == 1 else "days"
+        st.markdown(
+            f"""
+            <div class="regime-alert" style="border-color:{alert_style['solid']}; color:{alert_style['solid']};">
+                🚨 <b>REGIME SHIFT DETECTED</b> — market flipped from
+                <b>{prev_name}</b> to <b>{curr_name}</b> on <b>{shift_date}</b>
+                ({days_in_current_regime} trading {day_word} ago).
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # Current regime banner
     current_slot = int(data["State"].iloc[-1])
