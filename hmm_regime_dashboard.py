@@ -37,6 +37,10 @@ DARK_CSS = """
         background-color: #12161f;
         border-right: 1px solid #262b36;
     }
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+        color: #d8dee9 !important;
+    }
     div[data-testid="stMetric"] {
         background-color: #161b26;
         border: 1px solid #262b36;
