@@ -586,7 +586,7 @@ with tab_classifier:
             next_start = spans[i + 1][0]
             seg = pd.concat([seg, data.loc[[next_start]]])
         line_traces.append(
-            go.Scatter(
+            go.Scattergl(
                 x=seg.index,
                 y=seg["Close"],
                 mode="lines",
