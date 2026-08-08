@@ -388,11 +388,155 @@ slot_to_name = {0: "Bullish", 1: "Bearish", 2: "Neutral"}
 data["RegimeName"] = data["State"].map(slot_to_name)
 
 # --------------------------------------------------------------------------
-# Tabs: Regime Classifier | Dynamic Regime Router
+# Tabs: Read Me | Regime Classifier | Dynamic Regime Router
 # --------------------------------------------------------------------------
-tab_classifier, tab_router = st.tabs(
-    ["🔍 Regime Classifier", "🔀 Dynamic Regime Router"]
+tab_readme, tab_classifier, tab_router = st.tabs(
+    ["📖 Read Me", "🔍 Regime Classifier", "🔀 Dynamic Regime Router"]
 )
+
+# ============================================================================
+# TAB 0 — Read Me (plain-language explainer for non-finance/non-math users)
+# ============================================================================
+with tab_readme:
+    st.markdown(
+        """
+## What is this dashboard?
+
+This tool looks at a stock or fund's price history and tries to answer a
+simple question: **"is the market currently calm and rising, calm and
+falling, or choppy and uncertain?"** It labels every day in the past with
+one of three moods, and then uses that labeling to test a simple trading
+idea. Nothing here is financial advice — it's a way to explore an idea
+using historical data.
+
+---
+
+## The three "moods" (regimes)
+
+| Label | What it means in plain English |
+|---|---|
+| 🟢 **Bullish** | Prices have generally been climbing, and the ride has been relatively smooth. |
+| 🔴 **Bearish** | Prices have generally been falling, often with sharper, scarier swings. |
+| ⚪ **Neutral** | No strong trend either way — prices are drifting sideways or chopping around. |
+
+A "regime" is just a stretch of time that shares one of these moods. The
+market doesn't wear a label — this tool is making its best statistical
+guess based on patterns in the price data.
+
+---
+
+## How does it decide the mood? (Hidden Markov Model, in plain terms)
+
+The dashboard uses something called a **Hidden Markov Model**, or **HMM**.
+That name sounds intimidating, but the idea is simple:
+
+- Imagine the market is always secretly "in" one of the three moods above,
+  but you can't see the mood directly — you can only see the day-to-day
+  price movements it produces. The mood is **hidden**.
+- The model looks at two things about each day: how much the price moved
+  (**return**) and how jumpy or calm the recent price action has been
+  (**volatility** — see definitions below).
+- Based on patterns in those two numbers across the whole price history,
+  the model groups days into three clusters, then ranks them by their
+  average return: the cluster with the best average return becomes
+  "Bullish," the worst becomes "Bearish," and the one left over becomes
+  "Neutral."
+- It also learns how likely the market is to *stay* in a mood versus
+  *switch* to a different one from one day to the next — this is the
+  "Markov" part: tomorrow's mood depends only on today's mood, not on
+  the entire history before it.
+
+The model isn't told in advance what "Bullish" or "Bearish" should look
+like — it finds the groupings on its own, and this dashboard just applies
+sensible labels afterward based on which group did best and worst.
+
+---
+
+## Key terms, defined simply
+
+- **Log return** — a way of measuring how much a price moved from one day
+  to the next, expressed as a percentage-like number. You can think of it
+  as "daily percent change," calculated in a way that adds up cleanly
+  over many days.
+- **Realized volatility** — a measure of how much the price has been
+  bouncing around recently (over the last 14 trading days here), scaled
+  up to represent a full year. Higher volatility means bigger, more
+  unpredictable swings — calm markets have low volatility, turbulent ones
+  have high volatility.
+- **Trading day** — a day the stock market is open (weekdays, excluding
+  holidays).
+- **SMA (Simple Moving Average)** — the average price over the last *N*
+  days. A "10-day SMA" is just the average closing price over the past 10
+  trading days. Comparing a short SMA to a longer one is a common way to
+  spot whether a trend is forming.
+- **RSI (Relative Strength Index)** — a number between 0 and 100 that
+  measures whether a stock has recently been bought or sold more
+  aggressively than usual. Very low RSI (under 30) is often read as
+  "oversold" (potentially due for a bounce); very high RSI (over 70) is
+  read as "overbought."
+- **Equity curve** — a line chart showing how \$1 invested at the start
+  would have grown (or shrunk) over time, if you'd followed a given
+  strategy.
+- **Total Return** — the overall percentage gain or loss from the very
+  first day to the very last day.
+- **CAGR (Compound Annual Growth Rate)** — the Total Return expressed as
+  a smooth "per year" growth rate, so strategies over different time
+  periods can be compared fairly.
+- **Max Drawdown** — the single worst peak-to-valley decline the strategy
+  experienced. If your equity curve climbed to \$2, then fell to \$1.50
+  before recovering, that's a 25% drawdown. Smaller (less negative) is
+  better — it's a measure of "how bad did it get at the worst point."
+- **Annualized Volatility** — how bumpy the strategy's returns were,
+  scaled to a yearly figure. Lower usually means a smoother, less
+  stressful ride.
+- **Sharpe Ratio** — a single number that roughly answers "how much
+  return did this strategy generate for the amount of bumpiness
+  (risk) it took on?" Higher is generally better; it lets you compare a
+  smooth, modest strategy against a wild, higher-returning one on equal
+  footing.
+
+---
+
+## What the "Regime Classifier" tab shows
+
+That tab colors the price chart by which mood the model thinks the market
+was in on each day (green = Bullish, red = Bearish, gray = Neutral), shows
+summary statistics for each mood, and displays a banner with today's
+current predicted mood. It also has an alert that lights up when the mood
+has *just* changed recently, so you can see regime shifts as they happen.
+
+## What the "Dynamic Regime Router" tab shows
+
+This tab tests a simple idea: **what if you used a different trading
+strategy depending on the market's current mood?**
+
+- In a 🟢 Bullish mood, follow the trend (the "SMA 10/50" strategy: stay
+  invested when the short-term average price is above the long-term
+  average).
+- In a 🔴 Bearish mood, sit in cash to avoid the worst of the damage.
+- In a ⚪ Neutral mood, try to buy dips and sell bounces (the "RSI"
+  strategy).
+
+It then compares how that "smart switching" approach would have performed
+against simply buying and holding the whole time, using the metrics
+defined above (Total Return, CAGR, Max Drawdown, Sharpe Ratio). The
+comparison is run on **historical data only** — it does not predict the
+future, and past results are not a guarantee of what will happen next.
+
+---
+
+## A few honest caveats
+
+- This is a simplified educational model, not a professional trading
+  system. Real-world trading involves costs, taxes, slippage, and risks
+  that aren't captured here.
+- The model's "Bullish/Bearish/Neutral" labels are relative to the ticker
+  and time period you choose — they can shift if you change the ticker,
+  lookback period, or random seed.
+- Nothing on this page is investment advice. It's a tool for exploring
+  how a statistical idea behaves on historical prices.
+"""
+    )
 
 # ============================================================================
 # TAB 1 — Regime Classifier (original dashboard)
