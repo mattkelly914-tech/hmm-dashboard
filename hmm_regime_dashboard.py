@@ -574,6 +574,11 @@ with tab_classifier:
             mode="lines",
             name=f"{ticker} Close",
             line=dict(color="#f5f5f5", width=1.6),
+            customdata=data["RegimeName"],
+            hovertemplate=(
+                "%{x|%Y-%m-%d}<br>Price: %{y:.2f}"
+                "<br>Regime: <b>%{customdata}</b><extra></extra>"
+            ),
         )
     )
 
@@ -616,13 +621,22 @@ with tab_classifier:
         margin=dict(l=10, r=10, t=30, b=10),
         xaxis_title="Date",
         yaxis_title="Price",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+            font=dict(size=13, color="#e6e6e6"),
+        ),
         hovermode="x unified",
         paper_bgcolor="#0e1117",
         plot_bgcolor="#0e1117",
     )
 
     st.plotly_chart(fig_price, use_container_width=True)
+    st.caption(
+        "The background shading marks which regime the model assigned to "
+        "each period — colors match the legend dots above (green = "
+        "Bullish, red = Bearish, gray = Neutral). Hover over the price "
+        "line to see the exact regime for any date."
+    )
 
     # --------------------------------------------------------------------------
     # Regime-shift alert — fires when the current regime began recently
