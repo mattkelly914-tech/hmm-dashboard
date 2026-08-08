@@ -94,9 +94,9 @@ PLOTLY_TEMPLATE = "plotly_dark"
 
 # Regime color scheme (state label -> (name, rgba fill, solid hex))
 REGIME_STYLE = {
-    "Bullish": {"fill": "rgba(46, 204, 113, 0.18)", "solid": "#2ecc71"},
-    "Bearish": {"fill": "rgba(231, 76, 60, 0.20)", "solid": "#e74c3c"},
-    "Neutral": {"fill": "rgba(149, 165, 166, 0.20)", "solid": "#95a5a6"},
+    "Bullish": {"fill": "rgba(46, 204, 113, 0.45)", "solid": "#2ecc71"},
+    "Bearish": {"fill": "rgba(231, 76, 60, 0.40)", "solid": "#e74c3c"},
+    "Neutral": {"fill": "rgba(149, 165, 166, 0.40)", "solid": "#95a5a6"},
 }
 # Fixed 0/1/2 slot names, per spec: State 0 = Green, State 1 = Red, State 2 = Gray
 SLOT_ORDER = ["Bullish", "Bearish", "Neutral"]
@@ -567,41 +567,42 @@ with tab_classifier:
     st.subheader(f"{ticker} Price with HMM Regime Overlay")
 
     fig_price = go.Figure()
-    fig_price.add_trace(
-        go.Scatter(
-            x=data.index,
-            y=data["Close"],
-            mode="lines",
-            name=f"{ticker} Close",
-            line=dict(color="#f5f5f5", width=1.6),
-            customdata=data["RegimeName"],
-            hovertemplate=(
-                "%{x|%Y-%m-%d}<br>Price: %{y:.2f}"
-                "<br>Regime: <b>%{customdata}</b><extra></extra>"
-            ),
-        )
-    )
 
+    # Color each day's price segment by its regime. Background shading was
+    # tried first, but Bullish/Neutral states flip almost daily during calm
+    # markets (confirmed: ~900 separate 1-day-long spans each) — far too
+    # thin to see as a background band. Coloring the line itself makes
+    # every day's classification visible regardless of how short-lived it
+    # is, at the cost of the calm periods looking visually "speckled" —
+    # which honestly reflects the model being genuinely unsure day-to-day
+    # rather than hiding it.
     spans = contiguous_spans(data.index, data["State"].values)
-    shapes = []
-    for start, end, slot in spans:
+    line_traces = []
+    for i, (start, end, slot) in enumerate(spans):
         name = slot_to_name.get(slot, "Unknown")
-        style = REGIME_STYLE.get(name, {"fill": "rgba(150,150,150,0.15)"})
-        shapes.append(dict(
-            type="rect",
-            xref="x",
-            yref="paper",
-            x0=start,
-            x1=end,
-            y0=0,
-            y1=1,
-            fillcolor=style["fill"],
-            line_width=0,
-            layer="below",
-        ))
-    fig_price.update_layout(shapes=shapes)
+        style = REGIME_STYLE.get(name, {"solid": "#e6e6e6"})
+        seg = data.loc[start:end]
+        if i < len(spans) - 1:
+            next_start = spans[i + 1][0]
+            seg = pd.concat([seg, data.loc[[next_start]]])
+        line_traces.append(
+            go.Scatter(
+                x=seg.index,
+                y=seg["Close"],
+                mode="lines",
+                line=dict(color=style["solid"], width=1.8),
+                name=name,
+                showlegend=False,
+                customdata=seg["RegimeName"].values,
+                hovertemplate=(
+                    "%{x|%Y-%m-%d}<br>Price: %{y:.2f}"
+                    "<br>Regime: <b>%{customdata}</b><extra></extra>"
+                ),
+            )
+        )
+    fig_price.add_traces(line_traces)
 
-    # Dummy traces so a regime legend shows up (vrects don't appear in legend)
+    # Dummy traces so a regime legend shows up
     for slot in [0, 1, 2]:
         name = slot_to_name[slot]
         style = REGIME_STYLE[name]
@@ -632,10 +633,13 @@ with tab_classifier:
 
     st.plotly_chart(fig_price, use_container_width=True)
     st.caption(
-        "The background shading marks which regime the model assigned to "
-        "each period — colors match the legend dots above (green = "
-        "Bullish, red = Bearish, gray = Neutral). Hover over the price "
-        "line to see the exact regime for any date."
+        "Each day's price segment is colored by the regime the model "
+        "assigned to it — green = Bullish, red = Bearish, gray = Neutral "
+        "(matches the legend dots above). Hover over the line to see the "
+        "exact regime for any date. Sustained red stretches mark clear "
+        "bear markets; green/gray often mix rapidly during calmer periods "
+        "because the model finds those two regimes harder to tell apart "
+        "day-to-day."
     )
 
     # --------------------------------------------------------------------------
