@@ -316,9 +316,12 @@ def plot_equity_curves(df: pd.DataFrame) -> go.Figure:
         height=560,
         paper_bgcolor="#0e1117",
         plot_bgcolor="#0e1117",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(
+            orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5,
+            font=dict(size=13, color="#e6e6e6"),
+        ),
         hovermode="x unified",
-        margin=dict(l=10, r=10, t=50, b=10),
+        margin=dict(l=10, r=10, t=50, b=70),
     )
     fig.update_yaxes(gridcolor="rgba(255,255,255,0.08)")
     fig.update_xaxes(gridcolor="rgba(255,255,255,0.08)")
